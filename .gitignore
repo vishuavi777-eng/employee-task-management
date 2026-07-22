@@ -1,0 +1,30 @@
+# IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+# Maven
+**/target/
+.mvn/timing.properties
+
+# Logs
+*.log
+logs/
+
+# macOS
+.DS_Store
+
+# Environment and secrets
+.env
+*.env
+application-local.properties
+application-secret.properties
+
+# VS Code
+.vscode/
+
+# Temporary files
+*.tmp
+*.swp
