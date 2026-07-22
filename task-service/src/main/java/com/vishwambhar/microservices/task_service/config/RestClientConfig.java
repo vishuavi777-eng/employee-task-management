@@ -13,7 +13,9 @@ public class RestClientConfig {
 
     @Bean
     public RestClient.Builder restClientBuilder() {
+
         return RestClient.builder();
+        
     }
 
     @Bean
@@ -28,7 +30,9 @@ public class RestClientConfig {
     ) {
 
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+
         requestFactory.setConnectTimeout(connectTimeout);
+
         requestFactory.setReadTimeout(readTimeout);
 
         return builder

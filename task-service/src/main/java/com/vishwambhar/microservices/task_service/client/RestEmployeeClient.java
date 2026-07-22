@@ -8,7 +8,7 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
-@Component
+//@Component
 public class RestEmployeeClient implements EmployeeClient {
 
     private final RestClient employeeRestClient;
