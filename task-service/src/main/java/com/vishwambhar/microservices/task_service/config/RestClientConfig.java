@@ -8,7 +8,7 @@ import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
 
-@Configuration
+//@Configuration
 public class RestClientConfig {
 
     @Bean

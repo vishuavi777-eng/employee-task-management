@@ -6,10 +6,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
 @FeignClient(
-        name = "employee-service",
-        url = "${employee.service.base-url}"
+        name = "employee-service"
 )
 public interface EmployeeFeignApi {
     @GetMapping("/api/v1/employees/{employeeId}/validation")
-    EmployeeValidationResponse validateEmployee(@PathVariable Long employeeId);
+    EmployeeValidationResponse validateEmployee(@PathVariable("employeeId") Long employeeId);
 }
