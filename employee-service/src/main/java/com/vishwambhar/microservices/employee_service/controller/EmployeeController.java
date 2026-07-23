@@ -135,7 +135,8 @@ public class EmployeeController {
     validateEmployee(
             @Min(value = 1, message = "Employee ID must be greater than zero")
             @PathVariable Long employeeId
-    ) {
+    ) throws InterruptedException {
+        Thread.sleep(3000);
 
         EmployeeValidationResponse response =
                 employeeService.validateEmployee(employeeId);
