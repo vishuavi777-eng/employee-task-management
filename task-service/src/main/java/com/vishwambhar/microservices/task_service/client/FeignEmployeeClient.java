@@ -10,6 +10,8 @@ import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.ratelimiter.RequestNotPermitted;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
 import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.stereotype.Component;
 
@@ -24,6 +26,9 @@ public class FeignEmployeeClient implements EmployeeClient {
 
     private static final String EMPLOYEE_BULKHEAD =
             "employeeServiceBulkhead";
+
+    private static final String EMPLOYEE_RATE_LIMITER =
+            "employeeServiceRateLimiter";
 
     private final EmployeeFeignApi employeeFeignApi;
 
@@ -42,6 +47,7 @@ public class FeignEmployeeClient implements EmployeeClient {
             fallbackMethod = "validateEmployeeFallback"
     )
     @Retry(name = EMPLOYEE_RETRY)
+    @RateLimiter(name = EMPLOYEE_RATE_LIMITER)
     @Override
     public EmployeeValidationResponse validateEmployee(
             Long employeeId
@@ -96,6 +102,10 @@ public class FeignEmployeeClient implements EmployeeClient {
     ) {
         Throwable actualException = unwrap(throwable);
 
+        if (actualException instanceof RequestNotPermitted exception) {
+            throw exception;
+        }
+
         if (actualException instanceof BulkheadFullException) {
             throw new EmployeeServiceBusyException(
                     "Too many Employee Service validation requests are "
@@ -120,7 +130,8 @@ public class FeignEmployeeClient implements EmployeeClient {
             throw exception;
         }
 
-        if (actualException instanceof EmployeeServiceUnavailableException exception) {
+        if (actualException
+                instanceof EmployeeServiceUnavailableException exception) {
             throw exception;
         }
 

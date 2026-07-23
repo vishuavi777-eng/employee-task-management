@@ -8,11 +8,13 @@ import com.vishwambhar.microservices.employee_service.exception.EmployeeNotFound
 import com.vishwambhar.microservices.employee_service.mapper.EmployeeMapper;
 import com.vishwambhar.microservices.employee_service.repository.EmployeeRepository;
 import com.vishwambhar.microservices.employee_service.service.EmployeeService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+@Slf4j
 @Service
 public class EmployeeServiceImpl implements EmployeeService {
 
@@ -183,6 +185,10 @@ public class EmployeeServiceImpl implements EmployeeService {
     public EmployeeValidationResponse validateEmployee(
             Long employeeId
     ) {
+        log.info(
+                "Validating employee with ID: {}",
+                employeeId
+        );
         return employeeRepository
                 .findById(employeeId)
                 .map(employee -> {

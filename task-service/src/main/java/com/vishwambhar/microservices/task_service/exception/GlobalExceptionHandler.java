@@ -1,5 +1,6 @@
 package com.vishwambhar.microservices.task_service.exception;
 
+import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
@@ -171,6 +172,30 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(status)
                 .header(HttpHeaders.RETRY_AFTER, "2")
+                .body(response);
+    }
+
+    @ExceptionHandler(RequestNotPermitted.class)
+    public ResponseEntity<ApiErrorResponse> handleRateLimitExceeded(
+            RequestNotPermitted exception,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.TOO_MANY_REQUESTS;
+
+        ApiErrorResponse response = new ApiErrorResponse(
+                LocalDateTime.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                "EMPLOYEE_SERVICE_RATE_LIMIT_EXCEEDED",
+                "Too many Employee Service validation requests. "
+                        + "Please try again shortly.",
+                request.getRequestURI(),
+                null
+        );
+
+        return ResponseEntity
+                .status(status)
+                .header(HttpHeaders.RETRY_AFTER, "10")
                 .body(response);
     }
 
