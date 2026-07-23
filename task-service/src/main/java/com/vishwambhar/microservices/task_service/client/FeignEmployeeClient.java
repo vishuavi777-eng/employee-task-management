@@ -2,6 +2,7 @@ package com.vishwambhar.microservices.task_service.client;
 
 import com.vishwambhar.microservices.task_service.dto.EmployeeValidationResponse;
 import com.vishwambhar.microservices.task_service.exception.EmployeeServiceBusyException;
+import com.vishwambhar.microservices.task_service.exception.EmployeeServiceRateLimitException;
 import com.vishwambhar.microservices.task_service.exception.EmployeeServiceRequestException;
 import com.vishwambhar.microservices.task_service.exception.EmployeeServiceUnavailableException;
 import feign.FeignException;
@@ -49,9 +50,8 @@ public class FeignEmployeeClient implements EmployeeClient {
     @Retry(name = EMPLOYEE_RETRY)
     @RateLimiter(name = EMPLOYEE_RATE_LIMITER)
     @Override
-    public EmployeeValidationResponse validateEmployee(
-            Long employeeId
-    ) {
+    public EmployeeValidationResponse validateEmployee(Long employeeId) {
+
         try {
             EmployeeValidationResponse response =
                     employeeFeignApi.validateEmployee(employeeId);
@@ -67,7 +67,7 @@ public class FeignEmployeeClient implements EmployeeClient {
         } catch (RetryableException exception) {
 
             throw new EmployeeServiceUnavailableException(
-                    "Employee Service is unavailable or did not respond in time",
+                    "Employee Service is unavailable or timed out",
                     exception
             );
 
@@ -102,27 +102,33 @@ public class FeignEmployeeClient implements EmployeeClient {
     ) {
         Throwable actualException = unwrap(throwable);
 
-        if (actualException instanceof RequestNotPermitted exception) {
-            throw exception;
+        if (actualException instanceof RequestNotPermitted) {
+            throw new EmployeeServiceRateLimitException(
+                    "Employee Service request rate limit exceeded. "
+                            + "Please try again shortly.",
+                    actualException
+            );
         }
 
         if (actualException instanceof BulkheadFullException) {
             throw new EmployeeServiceBusyException(
-                    "Too many Employee Service validation requests are "
-                            + "currently running. Please try again shortly.",
+                    "Too many Employee Service requests are currently running.",
                     actualException
             );
         }
 
         if (actualException instanceof CallNotPermittedException) {
             throw new EmployeeServiceUnavailableException(
-                    "Employee Service is temporarily unavailable because "
-                            + "the circuit breaker is OPEN",
+                    "Employee Service circuit breaker is OPEN.",
                     actualException
             );
         }
 
         if (actualException instanceof EmployeeServiceRequestException exception) {
+            throw exception;
+        }
+
+        if (actualException instanceof EmployeeServiceRateLimitException exception) {
             throw exception;
         }
 
@@ -136,8 +142,7 @@ public class FeignEmployeeClient implements EmployeeClient {
         }
 
         throw new EmployeeServiceUnavailableException(
-                "Employee Service validation failed for employee ID: "
-                        + employeeId,
+                "Employee validation failed for employee ID: " + employeeId,
                 actualException
         );
     }
