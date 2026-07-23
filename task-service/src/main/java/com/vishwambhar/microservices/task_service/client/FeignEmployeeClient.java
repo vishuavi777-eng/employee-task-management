@@ -1,13 +1,23 @@
 package com.vishwambhar.microservices.task_service.client;
 
 import com.vishwambhar.microservices.task_service.dto.EmployeeValidationResponse;
+import com.vishwambhar.microservices.task_service.exception.EmployeeServiceRequestException;
 import com.vishwambhar.microservices.task_service.exception.EmployeeServiceUnavailableException;
 import feign.FeignException;
 import feign.RetryableException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.stereotype.Component;
 
 @Component
 public class FeignEmployeeClient implements EmployeeClient {
+
+    private static final String EMPLOYEE_SERVICE_CIRCUIT_BREAKER =
+            "employeeService";
+
+    private static final String EMPLOYEE_RETRY =
+            "employeeServiceRetry";
 
     private final EmployeeFeignApi employeeFeignApi;
 
@@ -17,6 +27,11 @@ public class FeignEmployeeClient implements EmployeeClient {
         this.employeeFeignApi = employeeFeignApi;
     }
 
+    @CircuitBreaker(
+            name = EMPLOYEE_SERVICE_CIRCUIT_BREAKER,
+            fallbackMethod = "validateEmployeeFallback"
+    )
+    @Retry(name = EMPLOYEE_RETRY)
     @Override
     public EmployeeValidationResponse validateEmployee(
             Long employeeId
@@ -62,14 +77,9 @@ public class FeignEmployeeClient implements EmployeeClient {
 
         } catch (FeignException.FeignClientException exception) {
 
-            /*
-             * Unexpected HTTP 4xx response.
-             *
-             * Our validation endpoint normally returns HTTP 200
-             * even when the employee does not exist.
-             */
-            throw new EmployeeServiceUnavailableException(
-                    "Employee Service rejected the validation request: "
+            // HTTP 4xx: not retryable.
+            throw new EmployeeServiceRequestException(
+                    "Employee Service rejected the request with status: "
                             + exception.status(),
                     exception
             );
@@ -81,5 +91,29 @@ public class FeignEmployeeClient implements EmployeeClient {
                     exception
             );
         }
+    }
+
+    public EmployeeValidationResponse validateEmployeeFallback(Long employeeId, Throwable throwable) {
+        if (throwable instanceof CallNotPermittedException) {
+            throw new EmployeeServiceUnavailableException(
+                    "Employee Service is temporarily unavailable because "
+                            + "the circuit breaker is OPEN",
+                    throwable
+            );
+        }
+
+        if (throwable instanceof EmployeeServiceRequestException exception) {
+            throw exception;
+        }
+
+        if (throwable instanceof EmployeeServiceUnavailableException exception) {
+            throw exception;
+        }
+
+        throw new EmployeeServiceUnavailableException(
+                "Employee Service validation failed for employee ID: "
+                        + employeeId,
+                throwable
+        );
     }
 }

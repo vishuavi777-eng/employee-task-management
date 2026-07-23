@@ -125,6 +125,30 @@ public class GlobalExceptionHandler {
                 .body(response);
     }
 
+    @ExceptionHandler(EmployeeServiceRequestException.class)
+    public ResponseEntity<ApiErrorResponse>
+    handleEmployeeServiceRequestException(
+            EmployeeServiceRequestException exception,
+            HttpServletRequest request
+    ) {
+
+        HttpStatus status = HttpStatus.BAD_GATEWAY;
+
+        ApiErrorResponse response = new ApiErrorResponse(
+                LocalDateTime.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                exception.getErrorCode(),
+                exception.getMessage(),
+                request.getRequestURI(),
+                null
+        );
+
+        return ResponseEntity
+                .status(status)
+                .body(response);
+    }
+
     @ExceptionHandler(
             jakarta.validation.ConstraintViolationException.class
     )
