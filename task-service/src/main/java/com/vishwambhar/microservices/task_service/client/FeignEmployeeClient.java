@@ -1,10 +1,13 @@
 package com.vishwambhar.microservices.task_service.client;
 
 import com.vishwambhar.microservices.task_service.dto.EmployeeValidationResponse;
+import com.vishwambhar.microservices.task_service.exception.EmployeeServiceBusyException;
 import com.vishwambhar.microservices.task_service.exception.EmployeeServiceRequestException;
 import com.vishwambhar.microservices.task_service.exception.EmployeeServiceUnavailableException;
 import feign.FeignException;
 import feign.RetryableException;
+import io.github.resilience4j.bulkhead.BulkheadFullException;
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import io.github.resilience4j.retry.annotation.Retry;
@@ -19,6 +22,9 @@ public class FeignEmployeeClient implements EmployeeClient {
     private static final String EMPLOYEE_RETRY =
             "employeeServiceRetry";
 
+    private static final String EMPLOYEE_BULKHEAD =
+            "employeeServiceBulkhead";
+
     private final EmployeeFeignApi employeeFeignApi;
 
     public FeignEmployeeClient(
@@ -27,6 +33,10 @@ public class FeignEmployeeClient implements EmployeeClient {
         this.employeeFeignApi = employeeFeignApi;
     }
 
+    @Bulkhead(
+            name = EMPLOYEE_BULKHEAD,
+            fallbackMethod = "validateEmployeeFallback"
+    )
     @CircuitBreaker(
             name = EMPLOYEE_SERVICE_CIRCUIT_BREAKER,
             fallbackMethod = "validateEmployeeFallback"
@@ -36,7 +46,6 @@ public class FeignEmployeeClient implements EmployeeClient {
     public EmployeeValidationResponse validateEmployee(
             Long employeeId
     ) {
-
         try {
             EmployeeValidationResponse response =
                     employeeFeignApi.validateEmployee(employeeId);
@@ -51,14 +60,6 @@ public class FeignEmployeeClient implements EmployeeClient {
 
         } catch (RetryableException exception) {
 
-            /*
-             * Usually includes:
-             *
-             * - Connection refused
-             * - Connect timeout
-             * - Read timeout
-             * - Temporary network failure
-             */
             throw new EmployeeServiceUnavailableException(
                     "Employee Service is unavailable or did not respond in time",
                     exception
@@ -66,9 +67,6 @@ public class FeignEmployeeClient implements EmployeeClient {
 
         } catch (FeignException.FeignServerException exception) {
 
-            /*
-             * Employee Service returned HTTP 5xx.
-             */
             throw new EmployeeServiceUnavailableException(
                     "Employee Service returned server error: "
                             + exception.status(),
@@ -77,7 +75,6 @@ public class FeignEmployeeClient implements EmployeeClient {
 
         } catch (FeignException.FeignClientException exception) {
 
-            // HTTP 4xx: not retryable.
             throw new EmployeeServiceRequestException(
                     "Employee Service rejected the request with status: "
                             + exception.status(),
@@ -93,27 +90,56 @@ public class FeignEmployeeClient implements EmployeeClient {
         }
     }
 
-    public EmployeeValidationResponse validateEmployeeFallback(Long employeeId, Throwable throwable) {
-        if (throwable instanceof CallNotPermittedException) {
-            throw new EmployeeServiceUnavailableException(
-                    "Employee Service is temporarily unavailable because "
-                            + "the circuit breaker is OPEN",
-                    throwable
+    public EmployeeValidationResponse validateEmployeeFallback(
+            Long employeeId,
+            Throwable throwable
+    ) {
+        Throwable actualException = unwrap(throwable);
+
+        if (actualException instanceof BulkheadFullException) {
+            throw new EmployeeServiceBusyException(
+                    "Too many Employee Service validation requests are "
+                            + "currently running. Please try again shortly.",
+                    actualException
             );
         }
 
-        if (throwable instanceof EmployeeServiceRequestException exception) {
+        if (actualException instanceof CallNotPermittedException) {
+            throw new EmployeeServiceUnavailableException(
+                    "Employee Service is temporarily unavailable because "
+                            + "the circuit breaker is OPEN",
+                    actualException
+            );
+        }
+
+        if (actualException instanceof EmployeeServiceRequestException exception) {
             throw exception;
         }
 
-        if (throwable instanceof EmployeeServiceUnavailableException exception) {
+        if (actualException instanceof EmployeeServiceBusyException exception) {
+            throw exception;
+        }
+
+        if (actualException instanceof EmployeeServiceUnavailableException exception) {
             throw exception;
         }
 
         throw new EmployeeServiceUnavailableException(
                 "Employee Service validation failed for employee ID: "
                         + employeeId,
-                throwable
+                actualException
         );
+    }
+
+    private Throwable unwrap(Throwable throwable) {
+        Throwable current = throwable;
+
+        while (current.getCause() != null
+                && (current instanceof java.util.concurrent.CompletionException
+                || current instanceof java.util.concurrent.ExecutionException)) {
+            current = current.getCause();
+        }
+
+        return current;
     }
 }

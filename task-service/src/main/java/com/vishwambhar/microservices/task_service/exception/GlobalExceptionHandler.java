@@ -2,6 +2,7 @@ package com.vishwambhar.microservices.task_service.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -146,6 +147,30 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(status)
+                .body(response);
+    }
+
+    @ExceptionHandler(EmployeeServiceBusyException.class)
+    public ResponseEntity<ApiErrorResponse>
+    handleEmployeeServiceBusyException(
+            EmployeeServiceBusyException exception,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.SERVICE_UNAVAILABLE;
+
+        ApiErrorResponse response = new ApiErrorResponse(
+                LocalDateTime.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                exception.getErrorCode(),
+                exception.getMessage(),
+                request.getRequestURI(),
+                null
+        );
+
+        return ResponseEntity
+                .status(status)
+                .header(HttpHeaders.RETRY_AFTER, "2")
                 .body(response);
     }
 
