@@ -17,6 +17,8 @@ public record ApiErrorResponse(
 
         String path,
 
-        Map<String, String> validationErrors
+        Map<String, String> validationErrors,
+
+        String correlationId
 ) {
 }

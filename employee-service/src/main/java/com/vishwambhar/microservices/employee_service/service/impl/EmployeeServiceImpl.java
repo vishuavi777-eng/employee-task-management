@@ -8,16 +8,18 @@ import com.vishwambhar.microservices.employee_service.exception.EmployeeNotFound
 import com.vishwambhar.microservices.employee_service.mapper.EmployeeMapper;
 import com.vishwambhar.microservices.employee_service.repository.EmployeeRepository;
 import com.vishwambhar.microservices.employee_service.service.EmployeeService;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-@Slf4j
+//@Slf4j
 @Service
 public class EmployeeServiceImpl implements EmployeeService {
 
+    private Logger logger = LoggerFactory.getLogger(EmployeeServiceImpl.class);
     private final EmployeeRepository employeeRepository;
     private final EmployeeMapper employeeMapper;
 
@@ -56,10 +58,15 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Transactional(readOnly = true)
     public EmployeeResponse getEmployeeById(Long employeeId) {
 
+        logEmployeeFetching(employeeId);
+
         Employee employee = employeeRepository
                 .findById(employeeId)
                 .orElseThrow(
-                        () -> new EmployeeNotFoundException(employeeId)
+                        () -> {
+                            logEmployeeNotFound(employeeId);
+                            return new EmployeeNotFoundException(employeeId);
+                        }
                 );
 
         return employeeMapper.toResponse(employee);
@@ -105,6 +112,7 @@ public class EmployeeServiceImpl implements EmployeeService {
             Long employeeId,
             EmployeeStatusUpdateRequest request
     ) {
+        logEmployeeUpdated(employeeId);
         Employee employee = getEmployeeEntity(employeeId);
 
         employee.changeStatus(request.status());
@@ -115,7 +123,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     @Transactional
     public void deactivateEmployee(Long employeeId) {
-
+        logEmployeeDelete(employeeId);
         Employee employee = getEmployeeEntity(employeeId);
 
         employee.changeStatus(EmployeeStatus.INACTIVE);
@@ -151,11 +159,14 @@ public class EmployeeServiceImpl implements EmployeeService {
     }
 
     private Employee getEmployeeEntity(Long employeeId) {
-
+        logEmployeeFetching(employeeId);
         return employeeRepository
                 .findById(employeeId)
                 .orElseThrow(
-                        () -> new EmployeeNotFoundException(employeeId)
+                        () -> {
+                            logEmployeeNotFound(employeeId);
+                            return new EmployeeNotFoundException(employeeId);
+                        }
                 );
     }
 
@@ -185,10 +196,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     public EmployeeValidationResponse validateEmployee(
             Long employeeId
     ) {
-        log.info(
-                "Validating employee with ID: {}",
-                employeeId
-        );
+        logEmployeeFetching(employeeId);
         return employeeRepository
                 .findById(employeeId)
                 .map(employee -> {
@@ -202,6 +210,17 @@ public class EmployeeServiceImpl implements EmployeeService {
                                     + " "
                                     + employee.getLastName();
 
+                    if (active) {
+                        logger.info(
+                                "Employee found successfully:employeeId={}, ActiveStatus:{}",
+                                employeeId, employee.getStatus()
+                        );
+                    } else {
+                        logger.warn(
+                                "Employee found successfully:employeeId={}, ActiveStatus:{}",
+                                employeeId, employee.getStatus()
+                        );
+                    }
                     return new EmployeeValidationResponse(
                             employee.getId(),
                             true,
@@ -211,8 +230,48 @@ public class EmployeeServiceImpl implements EmployeeService {
                     );
                 })
                 .orElseGet(
-                        () -> EmployeeValidationResponse
-                                .notFound(employeeId)
+                        () -> {
+                            logEmployeeNotFound(employeeId);
+                            return EmployeeValidationResponse
+                                .notFound(employeeId);
+                        }
                 );
+    }
+
+
+
+    private void logEmployeeFetching(Long employeeId) {
+        logger.info(
+                "Fetching employee: employeeId={}",
+                employeeId
+        );
+    }
+
+    private void logEmployeeUpdated(Long employeeId) {
+        logger.info(
+                "Updating employee: employeeId={}",
+                employeeId
+        );
+    }
+
+    private void logEmployeeDelete(Long employeeId) {
+        logger.info(
+                "Deleting employee: employeeId={}",
+                employeeId
+        );
+    }
+
+    private void logEmployeeStatusUpdating(Long employeeId) {
+        logger.info(
+                "Updating employee status: employeeId={}",
+                employeeId
+        );
+    }
+
+    private void logEmployeeNotFound(Long employeeId) {
+        logger.warn(
+                "Employee not found: employeeId={}",
+                employeeId
+        );
     }
 }

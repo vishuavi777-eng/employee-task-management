@@ -2,6 +2,12 @@ spring:
   application:
     name: api-gateway
 
+  profiles:
+    active: dev
+
+  config:
+    import: "configserver:http://localhost:8888"
+
   cloud:
     gateway:
       server:
@@ -29,11 +35,10 @@ eureka:
     prefer-ip-address: true
 
 management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,gateway
-
   endpoint:
     gateway:
       access: read-only
+
+logging:
+  file:
+    name: "${user.home}/microservices-logs/api-gateway.log"

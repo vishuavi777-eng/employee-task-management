@@ -9,6 +9,8 @@ import com.vishwambhar.microservices.task_service.exception.TaskNotFoundExceptio
 import com.vishwambhar.microservices.task_service.mapper.TaskMapper;
 import com.vishwambhar.microservices.task_service.repository.TaskRepository;
 import com.vishwambhar.microservices.task_service.service.TaskService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class TaskServiceImpl implements TaskService {
 
+    private static final Logger logger = LoggerFactory.getLogger(TaskServiceImpl.class);
     private final TaskRepository taskRepository;
     private final TaskMapper taskMapper;
     private final EmployeeClient employeeClient;
@@ -36,12 +39,15 @@ public class TaskServiceImpl implements TaskService {
     public TaskResponse createTask(
             TaskCreateRequest request
     ) {
+        logger.info("Creating task for employeeId={}", request.assignedEmployeeId());
 
         validateAssignedEmployee(request.assignedEmployeeId());
 
         Task task = taskMapper.toEntity(request);
 
         Task savedTask = taskRepository.save(task);
+
+        logger.info("Task created successfully: taskId={}, employeeId={}", savedTask.getId(), savedTask.getAssignedEmployeeId());
 
         return taskMapper.toResponse(savedTask);
     }
@@ -142,5 +148,7 @@ public class TaskServiceImpl implements TaskService {
                             + employeeId
             );
         }
+
+        logger.info("Employee validated successfully: employeeId={}", employee.employeeId());
     }
 }
