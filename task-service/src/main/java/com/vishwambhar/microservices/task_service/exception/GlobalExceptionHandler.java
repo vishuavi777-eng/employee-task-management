@@ -3,6 +3,8 @@ package com.vishwambhar.microservices.task_service.exception;
 import com.vishwambhar.microservices.task_service.logging.CorrelationIdConstants;
 import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpHeaders;
@@ -18,6 +20,9 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log =
+            LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(TaskNotFoundException.class)
     public ResponseEntity<ApiErrorResponse>
@@ -283,29 +288,32 @@ public class GlobalExceptionHandler {
                 .body(response);
     }
 
+
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiErrorResponse>
-    handleUnexpectedException(
+    public ResponseEntity<ApiErrorResponse> handleException(
             Exception exception,
             HttpServletRequest request
     ) {
-
-        HttpStatus status =
-                HttpStatus.INTERNAL_SERVER_ERROR;
+        log.error(
+                "Unexpected error while processing request. method={}, path={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                exception
+        );
 
         ApiErrorResponse response = new ApiErrorResponse(
                 LocalDateTime.now(),
-                status.value(),
-                status.getReasonPhrase(),
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "Internal Server Error",
                 "INTERNAL_SERVER_ERROR",
                 "An unexpected error occurred",
                 request.getRequestURI(),
                 null,
-                MDC.get(CorrelationIdConstants.CORRELATION_ID_MDC_KEY)
+                MDC.get("correlationId")
         );
 
         return ResponseEntity
-                .status(status)
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(response);
     }
 }
