@@ -15,6 +15,10 @@ public class NotificationService {
             LoggerFactory.getLogger(NotificationService.class);
 
     public void sendTaskCreatedNotification(TaskCreatedEvent event) {
+        this.triggerNotification(event);
+    }
+
+    private void triggerNotification(TaskCreatedEvent event) {
         String message =
                 "A new task has been assigned: " + event.title();
 
@@ -49,16 +53,7 @@ public class NotificationService {
             );
         }
 
-
-        String message =
-                "A new task has been assigned: " + event.title();
-
-        log.info(
-                "Notification sent. employeeId={}, taskId={}, message={}",
-                event.employeeId(),
-                event.taskId(),
-                message
-        );
+        this.triggerNotification(event);
     }
 
     public void sendTaskCreatedNotificationPermanentFailure(

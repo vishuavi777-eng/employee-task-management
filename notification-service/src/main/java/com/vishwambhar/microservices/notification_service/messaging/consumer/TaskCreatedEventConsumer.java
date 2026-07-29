@@ -27,8 +27,10 @@ public class TaskCreatedEventConsumer {
     )
     public void consume(TaskCreatedEvent event) {
 
+        String threadName = Thread.currentThread().getName();
         log.info(
-                "TaskCreatedEvent received. eventId={}, taskId={}, employeeId={}",
+                "TaskCreatedEvent received. threadName={}, eventId={}, taskId={}, employeeId={}",
+                threadName,
                 event.eventId(),
                 event.taskId(),
                 event.employeeId()
