@@ -50,6 +50,8 @@ pipeline {
     post {
         always {
             echo 'Pipeline finished'
+            archiveArtifacts artifacts: '**/target/*.jar',
+                                         fingerprint: true
         }
 
         success {
