@@ -12,7 +12,7 @@ pipeline {
         stage('Build & Package') {
             steps {
                 dir('employee-service') {
-                    sh 'mvn clean package'
+                    sh './mvnw clean package'
                 }
             }
         }
