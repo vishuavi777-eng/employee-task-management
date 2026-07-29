@@ -9,13 +9,29 @@ pipeline {
             }
         }
 
-        stage('Build & Package') {
+        stage('Build') {
             steps {
                 dir('employee-service') {
-                    sh './mvnw clean package'
+                    sh './mvnw clean test'
                 }
             }
         }
+
+        stage('Package') {
+            steps {
+                dir('employee-service') {
+                    sh './mvnw clean package -DskipTests'
+                }
+            }
+        }
+
+//         stage('Build & Package') {
+//             steps {
+//                 dir('employee-service') {
+//                     sh './mvnw clean package'
+//                 }
+//             }
+//         }
 
     }
 }
