@@ -4,6 +4,7 @@ import com.vishwambhar.microservices.task_service.messaging.RabbitMqNames;
 import com.vishwambhar.microservices.task_service.messaging.event.TaskCreatedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.connection.CorrelationData;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
@@ -52,5 +53,42 @@ public class TaskEventPublisher {
 
             throw exception;
         }
+    }
+
+    public void publishTaskCreatedWithCorrelation(TaskCreatedEvent event) {
+
+        CorrelationData correlationData =
+                new CorrelationData(event.eventId());
+
+        rabbitTemplate.convertAndSend(
+                RabbitMqNames.TASK_EVENTS_EXCHANGE,
+                RabbitMqNames.TASK_CREATED_ROUTING_KEY,
+                event,
+                message -> {
+                    message.getMessageProperties()
+                            .setMessageId(event.eventId());
+
+                    message.getMessageProperties()
+                            .setHeader(
+                                    "event-type",
+                                    "TaskCreatedEvent"
+                            );
+
+                    message.getMessageProperties()
+                            .setHeader(
+                                    "source-service",
+                                    "task-service"
+                            );
+
+                    return message;
+                },
+                correlationData
+        );
+
+        log.info(
+                "TaskCreatedEvent submitted for publishing. eventId={}, taskId={}",
+                event.eventId(),
+                event.taskId()
+        );
     }
 }

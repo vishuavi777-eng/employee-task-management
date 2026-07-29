@@ -65,7 +65,8 @@ public class TaskServiceImpl implements TaskService {
                 Instant.now()
         );
 
-        this.taskEventPublisher.publishTaskCreated(taskCreatedEvent);
+//        this.taskEventPublisher.publishTaskCreated(taskCreatedEvent);
+        this.taskEventPublisher.publishTaskCreatedWithCorrelation(taskCreatedEvent);
 
         return taskMapper.toResponse(savedTask);
     }

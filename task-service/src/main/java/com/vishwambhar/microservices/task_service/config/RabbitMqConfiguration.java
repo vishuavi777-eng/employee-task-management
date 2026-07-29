@@ -1,15 +1,13 @@
 package com.vishwambhar.microservices.task_service.config;
 
 import com.vishwambhar.microservices.task_service.messaging.RabbitMqNames;
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.Queue;
-import org.springframework.amqp.core.QueueBuilder;
+import com.vishwambhar.microservices.task_service.messaging.callback.RabbitPublisherCallback;
 import org.springframework.amqp.core.TopicExchange;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.boot.amqp.autoconfigure.RabbitTemplateCustomizer;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class RabbitMqConfiguration {
@@ -30,21 +28,12 @@ public class RabbitMqConfiguration {
         );
     }
 
-    /*@Bean
-    public Queue taskCreatedQueue() {
-        return QueueBuilder
-                .durable(RabbitMqNames.TASK_CREATED_QUEUE)
-                .build();
-    }
-
     @Bean
-    public Binding taskCreatedBinding(
-            Queue taskCreatedQueue,
-            TopicExchange taskEventsExchange
-    ) {
-        return BindingBuilder
-                .bind(taskCreatedQueue)
-                .to(taskEventsExchange)
-                .with(RabbitMqNames.TASK_CREATED_ROUTING_KEY);
-    }*/
+    public RabbitTemplateCustomizer rabbitTemplateCustomizer(RabbitPublisherCallback callback) {
+        return rabbitTemplate -> {
+          rabbitTemplate.setConfirmCallback(callback);
+          rabbitTemplate.setReturnsCallback(callback);
+          rabbitTemplate.setMandatory(true);
+        };
+    }
 }
