@@ -236,9 +236,9 @@ void buildService(String serviceName) {
     dir(serviceName) {
 
         if (params.RUN_TESTS) {
-            sh 'mvn clean package'
+            sh './mvnw clean package'
         } else {
-            sh 'mvn clean package -DskipTests'
+            sh './mvnw clean package -DskipTests'
         }
     }
 }
