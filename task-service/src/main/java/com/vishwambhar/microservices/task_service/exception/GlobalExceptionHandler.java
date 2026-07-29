@@ -1,7 +1,13 @@
 package com.vishwambhar.microservices.task_service.exception;
 
+import com.vishwambhar.microservices.task_service.logging.CorrelationIdConstants;
+import io.github.resilience4j.ratelimiter.RequestNotPermitted;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -14,6 +20,9 @@ import java.util.Map;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    private static final Logger log =
+            LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(TaskNotFoundException.class)
     public ResponseEntity<ApiErrorResponse>
@@ -31,7 +40,8 @@ public class GlobalExceptionHandler {
                 "TASK_NOT_FOUND",
                 exception.getMessage(),
                 request.getRequestURI(),
-                null
+                null,
+                MDC.get(CorrelationIdConstants.CORRELATION_ID_MDC_KEY)
         );
 
         return ResponseEntity
@@ -55,7 +65,8 @@ public class GlobalExceptionHandler {
                 exception.getErrorCode(),
                 exception.getMessage(),
                 request.getRequestURI(),
-                null
+                null,
+                MDC.get(CorrelationIdConstants.CORRELATION_ID_MDC_KEY)
         );
 
         return ResponseEntity
@@ -80,7 +91,8 @@ public class GlobalExceptionHandler {
                 exception.getErrorCode(),
                 exception.getMessage(),
                 request.getRequestURI(),
-                null
+                null,
+                MDC.get(CorrelationIdConstants.CORRELATION_ID_MDC_KEY)
         );
 
         return ResponseEntity
@@ -117,11 +129,87 @@ public class GlobalExceptionHandler {
                 "VALIDATION_FAILED",
                 "Request validation failed",
                 request.getRequestURI(),
-                validationErrors
+                validationErrors,
+                MDC.get(CorrelationIdConstants.CORRELATION_ID_MDC_KEY)
         );
 
         return ResponseEntity
                 .status(status)
+                .body(response);
+    }
+
+    @ExceptionHandler(EmployeeServiceRequestException.class)
+    public ResponseEntity<ApiErrorResponse>
+    handleEmployeeServiceRequestException(
+            EmployeeServiceRequestException exception,
+            HttpServletRequest request
+    ) {
+
+        HttpStatus status = HttpStatus.BAD_GATEWAY;
+
+        ApiErrorResponse response = new ApiErrorResponse(
+                LocalDateTime.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                exception.getErrorCode(),
+                exception.getMessage(),
+                request.getRequestURI(),
+                null,
+                MDC.get(CorrelationIdConstants.CORRELATION_ID_MDC_KEY)
+        );
+
+        return ResponseEntity
+                .status(status)
+                .body(response);
+    }
+
+    @ExceptionHandler(EmployeeServiceBusyException.class)
+    public ResponseEntity<ApiErrorResponse>
+    handleEmployeeServiceBusyException(
+            EmployeeServiceBusyException exception,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.SERVICE_UNAVAILABLE;
+
+        ApiErrorResponse response = new ApiErrorResponse(
+                LocalDateTime.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                exception.getErrorCode(),
+                exception.getMessage(),
+                request.getRequestURI(),
+                null,
+                MDC.get(CorrelationIdConstants.CORRELATION_ID_MDC_KEY)
+        );
+
+        return ResponseEntity
+                .status(status)
+                .header(HttpHeaders.RETRY_AFTER, "2")
+                .body(response);
+    }
+
+    @ExceptionHandler(RequestNotPermitted.class)
+    public ResponseEntity<ApiErrorResponse> handleRateLimitExceeded(
+            RequestNotPermitted exception,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.TOO_MANY_REQUESTS;
+
+        ApiErrorResponse response = new ApiErrorResponse(
+                LocalDateTime.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                "EMPLOYEE_SERVICE_RATE_LIMIT_EXCEEDED",
+                "Too many Employee Service validation requests. "
+                        + "Please try again shortly.",
+                request.getRequestURI(),
+                null,
+                MDC.get(CorrelationIdConstants.CORRELATION_ID_MDC_KEY)
+        );
+
+        return ResponseEntity
+                .status(status)
+                .header(HttpHeaders.RETRY_AFTER, "10")
                 .body(response);
     }
 
@@ -166,7 +254,8 @@ public class GlobalExceptionHandler {
                         "CONSTRAINT_VIOLATION",
                         "Request parameter validation failed",
                         request.getRequestURI(),
-                        validationErrors
+                        validationErrors,
+                        MDC.get(CorrelationIdConstants.CORRELATION_ID_MDC_KEY)
                 );
 
         return ResponseEntity
@@ -190,7 +279,8 @@ public class GlobalExceptionHandler {
                 "DATA_INTEGRITY_VIOLATION",
                 "The supplied employee data conflicts with existing data",
                 request.getRequestURI(),
-                null
+                null,
+                MDC.get(CorrelationIdConstants.CORRELATION_ID_MDC_KEY)
         );
 
         return ResponseEntity
@@ -198,28 +288,32 @@ public class GlobalExceptionHandler {
                 .body(response);
     }
 
+
     @ExceptionHandler(Exception.class)
-    public ResponseEntity<ApiErrorResponse>
-    handleUnexpectedException(
+    public ResponseEntity<ApiErrorResponse> handleException(
             Exception exception,
             HttpServletRequest request
     ) {
-
-        HttpStatus status =
-                HttpStatus.INTERNAL_SERVER_ERROR;
+        log.error(
+                "Unexpected error while processing request. method={}, path={}",
+                request.getMethod(),
+                request.getRequestURI(),
+                exception
+        );
 
         ApiErrorResponse response = new ApiErrorResponse(
                 LocalDateTime.now(),
-                status.value(),
-                status.getReasonPhrase(),
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "Internal Server Error",
                 "INTERNAL_SERVER_ERROR",
                 "An unexpected error occurred",
                 request.getRequestURI(),
-                null
+                null,
+                MDC.get("correlationId")
         );
 
         return ResponseEntity
-                .status(status)
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(response);
     }
 }

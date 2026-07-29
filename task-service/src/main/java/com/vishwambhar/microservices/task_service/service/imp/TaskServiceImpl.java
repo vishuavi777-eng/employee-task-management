@@ -7,28 +7,39 @@ import com.vishwambhar.microservices.task_service.enums.TaskStatus;
 import com.vishwambhar.microservices.task_service.exception.InvalidEmployeeException;
 import com.vishwambhar.microservices.task_service.exception.TaskNotFoundException;
 import com.vishwambhar.microservices.task_service.mapper.TaskMapper;
+import com.vishwambhar.microservices.task_service.messaging.event.TaskCreatedEvent;
+import com.vishwambhar.microservices.task_service.messaging.publisher.TaskEventPublisher;
 import com.vishwambhar.microservices.task_service.repository.TaskRepository;
 import com.vishwambhar.microservices.task_service.service.TaskService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.UUID;
+
 @Service
 public class TaskServiceImpl implements TaskService {
 
+    private static final Logger logger = LoggerFactory.getLogger(TaskServiceImpl.class);
     private final TaskRepository taskRepository;
     private final TaskMapper taskMapper;
     private final EmployeeClient employeeClient;
+    private final TaskEventPublisher taskEventPublisher;
 
     public TaskServiceImpl(
             TaskRepository taskRepository,
             TaskMapper taskMapper,
-            EmployeeClient employeeClient
+            EmployeeClient employeeClient,
+            TaskEventPublisher taskEventPublisher
     ) {
         this.taskRepository = taskRepository;
         this.taskMapper = taskMapper;
         this.employeeClient = employeeClient;
+        this.taskEventPublisher =  taskEventPublisher;
     }
 
     @Override
@@ -36,12 +47,26 @@ public class TaskServiceImpl implements TaskService {
     public TaskResponse createTask(
             TaskCreateRequest request
     ) {
+        logger.info("Creating task for employeeId={}", request.assignedEmployeeId());
 
         validateAssignedEmployee(request.assignedEmployeeId());
 
         Task task = taskMapper.toEntity(request);
 
         Task savedTask = taskRepository.save(task);
+
+        logger.info("Task created successfully: taskId={}, employeeId={}", savedTask.getId(), savedTask.getAssignedEmployeeId());
+
+        TaskCreatedEvent taskCreatedEvent = new TaskCreatedEvent(
+                UUID.randomUUID().toString(),
+                savedTask.getId(),
+                savedTask.getAssignedEmployeeId(),
+                savedTask.getTitle(),
+                Instant.now()
+        );
+
+//        this.taskEventPublisher.publishTaskCreated(taskCreatedEvent);
+        this.taskEventPublisher.publishTaskCreatedWithCorrelation(taskCreatedEvent);
 
         return taskMapper.toResponse(savedTask);
     }
@@ -142,5 +167,7 @@ public class TaskServiceImpl implements TaskService {
                             + employeeId
             );
         }
+
+        logger.info("Employee validated successfully: employeeId={}", employee.employeeId());
     }
 }

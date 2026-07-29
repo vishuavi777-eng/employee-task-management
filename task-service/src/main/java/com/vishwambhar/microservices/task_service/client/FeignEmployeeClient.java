@@ -1,13 +1,35 @@
 package com.vishwambhar.microservices.task_service.client;
 
 import com.vishwambhar.microservices.task_service.dto.EmployeeValidationResponse;
+import com.vishwambhar.microservices.task_service.exception.EmployeeServiceBusyException;
+import com.vishwambhar.microservices.task_service.exception.EmployeeServiceRateLimitException;
+import com.vishwambhar.microservices.task_service.exception.EmployeeServiceRequestException;
 import com.vishwambhar.microservices.task_service.exception.EmployeeServiceUnavailableException;
 import feign.FeignException;
 import feign.RetryableException;
+import io.github.resilience4j.bulkhead.BulkheadFullException;
+import io.github.resilience4j.bulkhead.annotation.Bulkhead;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.ratelimiter.RequestNotPermitted;
+import io.github.resilience4j.ratelimiter.annotation.RateLimiter;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.springframework.stereotype.Component;
 
 @Component
 public class FeignEmployeeClient implements EmployeeClient {
+
+    private static final String EMPLOYEE_SERVICE_CIRCUIT_BREAKER =
+            "employeeService";
+
+    private static final String EMPLOYEE_RETRY =
+            "employeeServiceRetry";
+
+    private static final String EMPLOYEE_BULKHEAD =
+            "employeeServiceBulkhead";
+
+    private static final String EMPLOYEE_RATE_LIMITER =
+            "employeeServiceRateLimiter";
 
     private final EmployeeFeignApi employeeFeignApi;
 
@@ -17,10 +39,18 @@ public class FeignEmployeeClient implements EmployeeClient {
         this.employeeFeignApi = employeeFeignApi;
     }
 
+    @Bulkhead(
+            name = EMPLOYEE_BULKHEAD,
+            fallbackMethod = "validateEmployeeFallback"
+    )
+    @CircuitBreaker(
+            name = EMPLOYEE_SERVICE_CIRCUIT_BREAKER,
+            fallbackMethod = "validateEmployeeFallback"
+    )
+    @Retry(name = EMPLOYEE_RETRY)
+    @RateLimiter(name = EMPLOYEE_RATE_LIMITER)
     @Override
-    public EmployeeValidationResponse validateEmployee(
-            Long employeeId
-    ) {
+    public EmployeeValidationResponse validateEmployee(Long employeeId) {
 
         try {
             EmployeeValidationResponse response =
@@ -36,24 +66,13 @@ public class FeignEmployeeClient implements EmployeeClient {
 
         } catch (RetryableException exception) {
 
-            /*
-             * Usually includes:
-             *
-             * - Connection refused
-             * - Connect timeout
-             * - Read timeout
-             * - Temporary network failure
-             */
             throw new EmployeeServiceUnavailableException(
-                    "Employee Service is unavailable or did not respond in time",
+                    "Employee Service is unavailable or timed out",
                     exception
             );
 
         } catch (FeignException.FeignServerException exception) {
 
-            /*
-             * Employee Service returned HTTP 5xx.
-             */
             throw new EmployeeServiceUnavailableException(
                     "Employee Service returned server error: "
                             + exception.status(),
@@ -62,14 +81,8 @@ public class FeignEmployeeClient implements EmployeeClient {
 
         } catch (FeignException.FeignClientException exception) {
 
-            /*
-             * Unexpected HTTP 4xx response.
-             *
-             * Our validation endpoint normally returns HTTP 200
-             * even when the employee does not exist.
-             */
-            throw new EmployeeServiceUnavailableException(
-                    "Employee Service rejected the validation request: "
+            throw new EmployeeServiceRequestException(
+                    "Employee Service rejected the request with status: "
                             + exception.status(),
                     exception
             );
@@ -81,5 +94,68 @@ public class FeignEmployeeClient implements EmployeeClient {
                     exception
             );
         }
+    }
+
+    public EmployeeValidationResponse validateEmployeeFallback(
+            Long employeeId,
+            Throwable throwable
+    ) {
+        Throwable actualException = unwrap(throwable);
+
+        if (actualException instanceof RequestNotPermitted) {
+            throw new EmployeeServiceRateLimitException(
+                    "Employee Service request rate limit exceeded. "
+                            + "Please try again shortly.",
+                    actualException
+            );
+        }
+
+        if (actualException instanceof BulkheadFullException) {
+            throw new EmployeeServiceBusyException(
+                    "Too many Employee Service requests are currently running.",
+                    actualException
+            );
+        }
+
+        if (actualException instanceof CallNotPermittedException) {
+            throw new EmployeeServiceUnavailableException(
+                    "Employee Service circuit breaker is OPEN.",
+                    actualException
+            );
+        }
+
+        if (actualException instanceof EmployeeServiceRequestException exception) {
+            throw exception;
+        }
+
+        if (actualException instanceof EmployeeServiceRateLimitException exception) {
+            throw exception;
+        }
+
+        if (actualException instanceof EmployeeServiceBusyException exception) {
+            throw exception;
+        }
+
+        if (actualException
+                instanceof EmployeeServiceUnavailableException exception) {
+            throw exception;
+        }
+
+        throw new EmployeeServiceUnavailableException(
+                "Employee validation failed for employee ID: " + employeeId,
+                actualException
+        );
+    }
+
+    private Throwable unwrap(Throwable throwable) {
+        Throwable current = throwable;
+
+        while (current.getCause() != null
+                && (current instanceof java.util.concurrent.CompletionException
+                || current instanceof java.util.concurrent.ExecutionException)) {
+            current = current.getCause();
+        }
+
+        return current;
     }
 }

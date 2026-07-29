@@ -1,6 +1,8 @@
 package com.vishwambhar.microservices.employee_service.exception;
 
+import com.vishwambhar.microservices.employee_service.logging.CorrelationIdConstants;
 import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.MDC;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -31,7 +33,8 @@ public class GlobalExceptionHandler {
                 exception.getErrorCode(),
                 exception.getMessage(),
                 request.getRequestURI(),
-                null
+                null,
+                MDC.get(CorrelationIdConstants.CORRELATION_ID_MDC_KEY)
         );
 
         return ResponseEntity
@@ -55,7 +58,8 @@ public class GlobalExceptionHandler {
                 "EMPLOYEE_NOT_FOUND",
                 exception.getMessage(),
                 request.getRequestURI(),
-                null
+                null,
+                MDC.get(CorrelationIdConstants.CORRELATION_ID_MDC_KEY)
         );
 
         return ResponseEntity
@@ -91,7 +95,8 @@ public class GlobalExceptionHandler {
                 "VALIDATION_FAILED",
                 "Request validation failed",
                 request.getRequestURI(),
-                validationErrors
+                validationErrors,
+                MDC.get(CorrelationIdConstants.CORRELATION_ID_MDC_KEY)
         );
 
         return ResponseEntity
@@ -140,7 +145,8 @@ public class GlobalExceptionHandler {
                         "CONSTRAINT_VIOLATION",
                         "Request parameter validation failed",
                         request.getRequestURI(),
-                        validationErrors
+                        validationErrors,
+                        MDC.get(CorrelationIdConstants.CORRELATION_ID_MDC_KEY)
                 );
 
         return ResponseEntity
@@ -164,7 +170,8 @@ public class GlobalExceptionHandler {
                 "DATA_INTEGRITY_VIOLATION",
                 "The supplied employee data conflicts with existing data",
                 request.getRequestURI(),
-                null
+                null,
+                MDC.get(CorrelationIdConstants.CORRELATION_ID_MDC_KEY)
         );
 
         return ResponseEntity
@@ -189,7 +196,8 @@ public class GlobalExceptionHandler {
                 "INTERNAL_SERVER_ERROR",
                 "An unexpected error occurred",
                 request.getRequestURI(),
-                null
+                null,
+                MDC.get(CorrelationIdConstants.CORRELATION_ID_MDC_KEY)
         );
 
         return ResponseEntity
