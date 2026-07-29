@@ -36,5 +36,10 @@ public class TaskCreatedEventConsumer {
         );
 
         notificationService.sendTaskCreatedNotification(event);
+
+        log.info(
+                "TaskCreatedEvent processed successfully. eventId={}",
+                event.eventId()
+        );
     }
 }
