@@ -24,14 +24,5 @@ pipeline {
                 }
             }
         }
-
-//         stage('Build & Package') {
-//             steps {
-//                 dir('employee-service') {
-//                     sh './mvnw clean package'
-//                 }
-//             }
-//         }
-
     }
 }
