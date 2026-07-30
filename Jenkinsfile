@@ -6,12 +6,14 @@ pipeline {
         jdk 'JDK-17'
     }
 
-    stage('Verify Java') {
-        steps {
-            sh '''
-                echo "JAVA_HOME=$JAVA_HOME"
-                java -version
-            '''
+    stages {
+        stage('Verify Java') {
+            steps {
+                sh '''
+                    echo "JAVA_HOME=$JAVA_HOME"
+                    java -version
+                '''
+            }
         }
     }
 
